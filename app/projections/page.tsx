@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useEffect, useState } from "react"
+import { Session } from '@supabase/supabase-js'
+import { supabase } from '@/app/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 interface Player {
   id: string
@@ -19,12 +22,36 @@ interface Player {
   confidence: number
 }
 
-export default function ProjectionsPage() {
+interface ProjectionsPageProps {
+  initialSession: Session | null
+}
+
+export default function ProjectionsPage({ initialSession }: ProjectionsPageProps) {
+  const router = useRouter()
+  const [session, setSession] = useState<Session | null>(initialSession)
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedSport, setSelectedSport] = useState("NBA")
   const [searchQuery, setSearchQuery] = useState("")
+
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session)
+        if (!session) {
+          // Redirect to login if session is lost
+          router.push('/login')
+        }
+      }
+    )
+
+    // Clean up subscription on unmount
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [router])
 
   useEffect(() => {
     fetchPlayers()
@@ -57,6 +84,15 @@ export default function ProjectionsPage() {
     player.team.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // If no session, show a loading state or redirect in useEffect
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#00B4D8] mx-auto"></div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden relative">
       {/* Decorative gradient elements */}
@@ -69,13 +105,22 @@ export default function ProjectionsPage() {
 
       {/* Header */}
       <header className="relative z-10 bg-black/50 backdrop-blur-sm border-b border-gray-800 py-6">
-        <div className="container mx-auto px-4">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-[#90E0EF] via-[#00B4D8] to-[#0077B6] text-transparent bg-clip-text">
-            Player Projections
-          </h1>
-          <p className="mt-2 text-gray-400">
-            Find the best value in player props across all major sportsbooks
-          </p>
+        <div className="container mx-auto px-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-[#90E0EF] via-[#00B4D8] to-[#0077B6] text-transparent bg-clip-text">
+              Player Projections
+            </h1>
+            <p className="mt-2 text-gray-400">
+              Find the best value in player props across all major sportsbooks
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => router.push('/')}
+            className="border-gray-700 hover:bg-gray-800"
+          >
+            Back to Home
+          </Button>
         </div>
       </header>
 

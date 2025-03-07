@@ -29,158 +29,78 @@ export async function GET(request: Request) {
 
     console.log(`Using sport key: ${sportKey}`)
 
-    // Fetch games and player props
-    const [gamesResponse, playerPropsResponse] = await Promise.all([
-      fetch(
-        `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h,spreads&oddsFormat=american`,
-        { next: { revalidate: 300 } }
-      ),
-      fetch(
-        `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=us&markets=player_points,player_rebounds,player_assists&oddsFormat=american`,
-        { next: { revalidate: 300 } }
-      )
-    ])
+    // For now, return mock data to test the frontend
+    const mockPlayers = [
+      {
+        id: '1',
+        name: 'LeBron James',
+        team: 'Lakers',
+        position: 'SF',
+        projection: 28.5,
+        line: 27.5,
+        edge: 3.6,
+        confidence: 85,
+        opponent: 'Warriors',
+        gameTime: '7:30 PM',
+        stats: {
+          points: 28.5,
+          rebounds: 8.2,
+          assists: 7.1,
+          pointsLine: '27.5',
+          reboundsLine: '7.5',
+          assistsLine: '6.5'
+        }
+      },
+      {
+        id: '2',
+        name: 'Stephen Curry',
+        team: 'Warriors',
+        position: 'PG',
+        projection: 32.5,
+        line: 31.5,
+        edge: 3.2,
+        confidence: 82,
+        opponent: 'Lakers',
+        gameTime: '7:30 PM',
+        stats: {
+          points: 32.5,
+          rebounds: 5.2,
+          assists: 6.8,
+          pointsLine: '31.5',
+          reboundsLine: '5.0',
+          assistsLine: '6.5'
+        }
+      },
+      {
+        id: '3',
+        name: 'Anthony Davis',
+        team: 'Lakers',
+        position: 'PF',
+        projection: 24.5,
+        line: 23.5,
+        edge: 4.3,
+        confidence: 88,
+        opponent: 'Warriors',
+        gameTime: '7:30 PM',
+        stats: {
+          points: 24.5,
+          rebounds: 12.2,
+          assists: 3.1,
+          pointsLine: '23.5',
+          reboundsLine: '12.0',
+          assistsLine: '3.0'
+        }
+      }
+    ]
 
-    if (!gamesResponse.ok) {
-      const errorText = await gamesResponse.text()
-      console.error('Games API error:', {
-        status: gamesResponse.status,
-        statusText: gamesResponse.statusText,
-        body: errorText
-      })
-      throw new Error(`Failed to fetch games: ${gamesResponse.status} ${gamesResponse.statusText}`)
-    }
-
-    if (!playerPropsResponse.ok) {
-      const errorText = await playerPropsResponse.text()
-      console.error('Player Props API error:', {
-        status: playerPropsResponse.status,
-        statusText: playerPropsResponse.statusText,
-        body: errorText
-      })
-      throw new Error(`Failed to fetch player props: ${playerPropsResponse.status} ${playerPropsResponse.statusText}`)
-    }
-
-    const games = await gamesResponse.json()
-    const playerProps = await playerPropsResponse.json()
-
-    console.log('Games data:', games.map((g: any) => ({ 
-      home: g.home_team, 
-      away: g.away_team,
-      time: g.commence_time 
-    })))
-    console.log('Player props data:', playerProps.map((p: any) => ({
-      home: p.home_team,
-      away: p.away_team,
-      markets: Object.keys(p)
-    })))
-
-    // Fetch player data from sports API
-    const playersResponse = await fetch(
-      `https://api.sportsdata.io/v3/${sport.toLowerCase()}/stats/json/players?key=${SPORTS_API_KEY}`,
-      { next: { revalidate: 3600 } }
-    )
-
-    if (!playersResponse.ok) {
-      const errorText = await playersResponse.text()
-      console.error('SportsData API error:', {
-        status: playersResponse.status,
-        statusText: playersResponse.statusText,
-        body: errorText
-      })
-      throw new Error(`Failed to fetch player data: ${playersResponse.status} ${playersResponse.statusText}`)
-    }
-
-    const playersData = await playersResponse.json()
-    console.log('Players data sample:', playersData.slice(0, 2).map((p: any) => ({
-      name: p.Name,
-      team: p.Team,
-      position: p.Position,
-      points: p.Points
-    })))
-
-    // Process the data to create player projections
-    const players = games.flatMap((game: any) => {
-      const homeTeam = game.home_team
-      const awayTeam = game.away_team
-      const gameTime = new Date(game.commence_time).toLocaleTimeString()
-
-      // Find players for each team
-      const homePlayers = playersData.filter((p: any) => p.Team === homeTeam)
-      const awayPlayers = playersData.filter((p: any) => p.Team === awayTeam)
-
-      console.log(`Found ${homePlayers.length} home players and ${awayPlayers.length} away players for game ${homeTeam} vs ${awayTeam}`)
-
-      // Find player props for this game
-      const gameProps = playerProps.find((p: any) => 
-        p.home_team === homeTeam && p.away_team === awayTeam
-      )
-
-      // Create player objects with real data
-      return [
-        ...homePlayers.map((player: any) => {
-          // Find player props for points, rebounds, and assists
-          const pointsProps = gameProps?.player_points?.find((p: any) => p.player === player.Name)
-          const reboundsProps = gameProps?.player_rebounds?.find((p: any) => p.player === player.Name)
-          const assistsProps = gameProps?.player_assists?.find((p: any) => p.player === player.Name)
-
-          return {
-            id: `${player.PlayerID}-${game.id}`,
-            name: player.Name,
-            team: homeTeam,
-            position: player.Position,
-            projection: pointsProps?.outcomes?.[0]?.price || 0,
-            line: pointsProps?.outcomes?.[0]?.name || 0,
-            edge: calculateEdge(pointsProps?.outcomes?.[0]?.price || 0, pointsProps?.outcomes?.[0]?.name || 0),
-            confidence: calculateConfidence(player.Points, pointsProps?.outcomes?.[0]?.name || 0),
-            opponent: awayTeam,
-            gameTime,
-            stats: {
-              points: player.Points,
-              rebounds: player.Rebounds,
-              assists: player.Assists,
-              pointsLine: pointsProps?.outcomes?.[0]?.name,
-              reboundsLine: reboundsProps?.outcomes?.[0]?.name,
-              assistsLine: assistsProps?.outcomes?.[0]?.name,
-            }
-          }
-        }),
-        ...awayPlayers.map((player: any) => {
-          // Find player props for points, rebounds, and assists
-          const pointsProps = gameProps?.player_points?.find((p: any) => p.player === player.Name)
-          const reboundsProps = gameProps?.player_rebounds?.find((p: any) => p.player === player.Name)
-          const assistsProps = gameProps?.player_assists?.find((p: any) => p.player === player.Name)
-
-          return {
-            id: `${player.PlayerID}-${game.id}`,
-            name: player.Name,
-            team: awayTeam,
-            position: player.Position,
-            projection: pointsProps?.outcomes?.[0]?.price || 0,
-            line: pointsProps?.outcomes?.[0]?.name || 0,
-            edge: calculateEdge(pointsProps?.outcomes?.[0]?.price || 0, pointsProps?.outcomes?.[0]?.name || 0),
-            confidence: calculateConfidence(player.Points, pointsProps?.outcomes?.[0]?.name || 0),
-            opponent: homeTeam,
-            gameTime,
-            stats: {
-              points: player.Points,
-              rebounds: player.Rebounds,
-              assists: player.Assists,
-              pointsLine: pointsProps?.outcomes?.[0]?.name,
-              reboundsLine: reboundsProps?.outcomes?.[0]?.name,
-              assistsLine: assistsProps?.outcomes?.[0]?.name,
-            }
-          }
-        })
-      ]
-    })
-
-    console.log(`Generated ${players.length} player projections`)
-    return NextResponse.json(players)
+    return NextResponse.json(mockPlayers)
   } catch (error) {
     console.error('Error in players API route:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch players' },
+      { 
+        error: error instanceof Error ? error.message : 'Failed to fetch players',
+        details: 'Please try again later or contact support if the issue persists.'
+      },
       { status: 500 }
     )
   }

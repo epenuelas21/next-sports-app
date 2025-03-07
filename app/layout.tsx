@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Next Sports App",
-  description: "Your hub for sports stats and betting lines",
+  title: "PropFinds",
+  description: "Sports Analytics Platform",
 };
 
 export default function RootLayout({
