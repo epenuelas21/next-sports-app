@@ -22,3 +22,23 @@ body {
   color: white;
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.gradient-button {
+  background: linear-gradient(90deg, #90E0EF 0%, #00B4D8 25%, #FF00FF 50%, #00B4D8 75%, #90E0EF 100%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+  transition: all 0.3s ease;
+}
+
+.gradient-button:hover {
+  animation: gradientShift 1s linear infinite;
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
